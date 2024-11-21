@@ -1,0 +1,17 @@
+[project]
+name = "google-photos-takeout-model"
+version = "0.0.0"
+description = "Model for Google Takeout data for Google Photos"
+readme = "README.md"
+authors = [
+    { name = "blakeNaccarato", email = "blake.naccarato@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+google-photos-takeout-model = "google_photos_takeout_model:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
