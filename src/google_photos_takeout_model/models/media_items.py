@@ -3,81 +3,81 @@ from __future__ import annotations
 from json import loads
 from pathlib import Path
 from re import match
-from typing import TypedDict
+from typing import Annotated as Ann
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Discriminator, Field, Tag
+from pydantic.alias_generators import to_snake
 
-from google_photos_takeout_model.models import GeoData, Time
+from google_photos_takeout_model.models.bases import GeoData, Time, ToCamelBaseModel
+from google_photos_takeout_model.models.google_photos_origins import (
+    GooglePhotosCompositionOrigin,
+    GooglePhotosMobileOrigin,
+    GooglePhotosPartnerSharingOrigin,
+    GooglePhotosSharedAlbumOrigin,
+    GooglePhotosWebOrigin,
+)
 
 MEDIA_ITEM_GLOB = "[!metadata]*[!.json]"
 PARENTHESIZED_MEDIA_ITEM_STEM = r"(?P<name>^.*[^\s])\((?P<num>\d+)\)$"
 NAME_MAX_LENGTH = 51
-JSON_SUFFIX = ".json"
-JSON_STEM_MAX_LENGTH = NAME_MAX_LENGTH - len(JSON_SUFFIX)
+JSON = ".json"
+JSON_STEM_MAX_LENGTH = NAME_MAX_LENGTH - len(JSON)
 
 
-class EmptyDict(TypedDict): ...
-
-
-class DeviceFolder(BaseModel):
-    localFolderName: str
-
-
-class Composition(BaseModel):
-    type: str
-
-
-class GooglePhotosCompositionOrigin(BaseModel):
-    composition: Composition
-
-
-class MobileUpload(BaseModel):
-    deviceFolder: DeviceFolder
-    deviceType: str
-
-
-class GooglePhotosMobileOrigin(BaseModel):
-    mobileUpload: MobileUpload | EmptyDict
-
-
-class GooglePhotosPartnerSharingOrigin(BaseModel):
-    fromPartnerSharing: EmptyDict
-
-
-class GooglePhotosSharedAlbumOrigin(BaseModel):
-    fromSharedAlbum: EmptyDict
-
-
-class WebUpload(BaseModel):
-    computerUpload: EmptyDict
-
-
-class GooglePhotosWebOrigin(BaseModel):
-    webUpload: WebUpload
-
-
-class Person(BaseModel):
+class Person(ToCamelBaseModel):
     name: str
 
 
-class MediaItem(BaseModel):
+def discriminate_google_photos_origin(obj: dict[str, Any] | BaseModel) -> str:
+    fields = [
+        to_snake(field) for field in (obj if isinstance(obj, dict) else dict(obj))
+    ]
+    match fields:
+        case ["composition", *_]:
+            return GooglePhotosCompositionOrigin.__name__
+        case ["mobile_upload", *_]:
+            return GooglePhotosMobileOrigin.__name__
+        case ["from_partner_sharing", *_]:
+            return GooglePhotosPartnerSharingOrigin.__name__
+        case ["from_shared_album", *_]:
+            return GooglePhotosSharedAlbumOrigin.__name__
+        case ["web_upload", *_]:
+            return GooglePhotosWebOrigin.__name__
+        case _:
+            raise ValueError(f"Can't discriminate GooglePhotosOrigin from {obj}.")
+
+
+class MediaItem(ToCamelBaseModel):
     path: Path
     metadata_path: Path
     title: str
     description: str
-    imageViews: str
-    creationTime: Time
-    photoTakenTime: Time
-    geoData: GeoData
-    geoDataExif: GeoData
+    image_views: str
+    creation_time: Time
+    photo_taken_time: Time
+    geo_data: GeoData
+    geo_data_exif: GeoData
     people: list[Person] = Field(default_factory=list)
     url: str
-    googlePhotosOrigin: (
-        GooglePhotosCompositionOrigin
-        | GooglePhotosMobileOrigin
-        | GooglePhotosPartnerSharingOrigin
-        | GooglePhotosSharedAlbumOrigin
-        | GooglePhotosWebOrigin
+    google_photos_origin: (
+        Ann[
+            Ann[
+                GooglePhotosCompositionOrigin,
+                Tag(GooglePhotosCompositionOrigin.__name__),
+            ]
+            | Ann[GooglePhotosMobileOrigin, Tag(GooglePhotosMobileOrigin.__name__)]
+            | Ann[
+                GooglePhotosPartnerSharingOrigin,
+                Tag(GooglePhotosPartnerSharingOrigin.__name__),
+            ]
+            | Ann[
+                GooglePhotosSharedAlbumOrigin,
+                Tag(GooglePhotosSharedAlbumOrigin.__name__),
+            ]
+            | Ann[GooglePhotosWebOrigin, Tag(GooglePhotosWebOrigin.__name__)],
+            Discriminator(discriminate_google_photos_origin),
+        ]
         | None
     ) = None
 
@@ -99,7 +99,7 @@ class MediaItem(BaseModel):
                 )
             elif len(path.name) > JSON_STEM_MAX_LENGTH:
                 metadata_path = path.with_name(
-                    f"{path.name[:JSON_STEM_MAX_LENGTH]}{JSON_SUFFIX}"
+                    f"{path.name[:JSON_STEM_MAX_LENGTH]}{JSON}"
                 )
             elif stem := match(PARENTHESIZED_MEDIA_ITEM_STEM, path.stem):
                 if (

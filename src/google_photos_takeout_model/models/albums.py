@@ -3,15 +3,15 @@ from __future__ import annotations
 from json import loads
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from google_photos_takeout_model.models import GeoData, Time
+from google_photos_takeout_model.models.bases import GeoData, Time, ToCamelBaseModel
 from google_photos_takeout_model.models.media_items import MediaItem, get_media_items
 
 ALBUM_METADATA = "metadata.json"
 
 
-class Album(BaseModel):
+class Album(ToCamelBaseModel):
     path: Path
     metadata_path: Path
     media_items: list[MediaItem] = Field(default_factory=list)
@@ -21,7 +21,7 @@ class Album(BaseModel):
     access: str
     date: Time
     location: str
-    geoData: GeoData
+    geo_data: GeoData
 
     @classmethod
     def from_path(cls, path: Path) -> Album:
