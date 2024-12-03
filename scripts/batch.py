@@ -7,7 +7,7 @@ from pyautogui import hotkey as h
 from pyautogui import press as p
 
 DEBUG = False
-BATCH = 16
+BATCH = 24
 KILLSWITCH = "esc"
 pyautogui.PAUSE = 0.5
 
