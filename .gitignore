@@ -1,3 +1,7 @@
+# Auth and data
+albums*.*
+storage-state.json
+
 # Python-generated files
 __pycache__/
 *.py[oc]
