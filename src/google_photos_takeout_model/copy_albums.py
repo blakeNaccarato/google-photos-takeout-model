@@ -27,10 +27,6 @@ async def main():
 
 
 async def copy_album(title: str, albs: dict[Kinds, Albums], pg: Page):
-    # # ? Revisit these albums with images saved from more than one person
-    # await pg.get_by_label("View activity", exact=True).click()
-    # if await pg.get_by_text("Saved", exact=True).count() > 1:
-    #     update_album_list(albs, "saved", title, pg.url)
     shared = (
         await pg.get_by_role("button", name=GPHOTOS_SHARED_PERSON).count()
         if GPHOTOS_SHARED_PERSON
