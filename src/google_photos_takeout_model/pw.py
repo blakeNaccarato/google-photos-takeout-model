@@ -6,12 +6,11 @@ from playwright.async_api import BrowserContext, Page, PlaywrightContextManager
 
 GPHOTOS_BASE_URL = "https://photos.google.com"
 STORAGE_STATE = Path("storage-state.json")
-LARGE_ALBUM_THRESHOLD = 400
-DEFAULT_WAIT = 500
-WAIT = 2 * DEFAULT_WAIT
-LONG_WAIT = 5 * DEFAULT_WAIT
-LONGER_WAIT = 7 * DEFAULT_WAIT
-WAIT_THRESHOLD = 15_000
+LARGE_ALBUM_COUNT = 400
+SLOW_MO_WAIT = 500
+WAIT = 2 * SLOW_MO_WAIT
+LONG_WAIT = 5 * SLOW_MO_WAIT
+TIMEOUT = 15_000
 
 
 @asynccontextmanager
@@ -22,7 +21,7 @@ async def browser():
             args=["--disable-blink-features=AutomationControlled"],
             channel="chrome",
             headless=False,
-            slow_mo=DEFAULT_WAIT,
+            slow_mo=SLOW_MO_WAIT,
         )
         yield browser
         browser.close()

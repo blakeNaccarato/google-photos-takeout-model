@@ -17,7 +17,7 @@ from google_photos_takeout_model import (
     select_all_photos,
     update_album_list,
 )
-from google_photos_takeout_model.pw import WAIT_THRESHOLD
+from google_photos_takeout_model.pw import TIMEOUT
 
 # TODO: Implement as finite state machine, e.g. awaiting empty album depends on state.
 
@@ -68,7 +68,7 @@ async def move_to_trash(pg: Page):
         await pg.get_by_role("button", name="Delete").click()
         return
     waited = 0
-    while (waited < WAIT_THRESHOLD) and (
+    while (waited < TIMEOUT) and (
         await more_options_available(pg) or not await album_empty_after_deleting(pg)
     ):
         waited += WAIT

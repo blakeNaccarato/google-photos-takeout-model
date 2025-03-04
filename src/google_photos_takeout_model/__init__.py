@@ -10,7 +10,7 @@ from typing import Literal, Self, TypeAlias, get_args
 from playwright.async_api import Page
 
 from google_photos_takeout_model.pw import (
-    LARGE_ALBUM_THRESHOLD,
+    LARGE_ALBUM_COUNT,
     LONG_WAIT,
     WAIT,
     log_in,
@@ -18,6 +18,7 @@ from google_photos_takeout_model.pw import (
 )
 
 GPHOTOS_SHARED_PERSON = environ.get("GPHOTOS_SHARED_PERSON", "")
+GPHOTOS_ALBUM = environ.get("GPHOTOS_ALBUM", "")
 
 Kinds: TypeAlias = Literal[
     "copied",
@@ -63,7 +64,7 @@ async def select_all_photos(pg: Page):
 
 async def many_photos_selected(pg: Page) -> bool:
     return bool(selected := await pg.get_by_text("selected").text_content()) and (
-        int(selected.split()[0]) > LARGE_ALBUM_THRESHOLD
+        int(selected.split()[0]) > LARGE_ALBUM_COUNT
     )
 
 
