@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from asyncio import run
+from contextlib import asynccontextmanager
 from json import loads
 from pathlib import Path
 from re import compile
@@ -16,9 +17,11 @@ GPHOTOS_ALBUM = argv[1] if len(argv) > 1 else ""
 ALBUM = Path("album.json")
 
 
-async def main():
+async def main(album: str = GPHOTOS_ALBUM):
+    if not album:
+        raise ValueError("Album link required.")
     async with logged_in() as pg:
-        await get_all_media_metadata(pg)
+        await get_all_media_metadata(pg, album)
 
 
 async def get_image_preview_url(pg: Page):
@@ -42,9 +45,7 @@ async def get_url(loc: Locator) -> str:
     return download_url
 
 
-async def get_all_media_metadata(pg: Page, album: str = GPHOTOS_ALBUM):
-    if not album:
-        raise ValueError("Album link required.")
+async def get_all_media_metadata(pg: Page, album: str):
     await pg.goto(album)
     if ALBUM.exists():
         alb = Album(**loads(ALBUM.read_text(encoding="utf-8")))
@@ -62,9 +63,9 @@ async def get_all_media_metadata(pg: Page, album: str = GPHOTOS_ALBUM):
     album_item_count = await get_item_count(pg)
     current_media_item = len(alb.media_items)
     for _ in tqdm(range(1, current_media_item)):
-        await nav_next(loc_main(pg))
+        await nav_next(pg)
     for _ in tqdm(range(current_media_item, album_item_count)):
-        await nav_next(loc_main(pg))
+        await nav_next(pg)
         alb.media_items.append(
             MediaItem(
                 item=pg.url,
@@ -74,7 +75,7 @@ async def get_all_media_metadata(pg: Page, album: str = GPHOTOS_ALBUM):
                 position=await get_position(pg),
             )
         )
-        ALBUM.write_text(encoding="utf-8", data=album_dumps(alb))
+    ALBUM.write_text(encoding="utf-8", data=album_dumps(alb))
 
 
 def loc_albums_containing_item(loc: Locator | Page) -> Locator:
@@ -110,13 +111,19 @@ async def get_position(loc: Locator | Page) -> str:
 
 
 async def nav_first(loc: Locator | Page):
-    await loc_album_items(loc).first.click()
+    async with nav(loc):
+        await loc_album_items(loc).first.click()
 
 
-async def nav_next(loc: Locator):
-    prev_url = loc.page.url
-    await loc.press("ArrowRight")
-    await loc.page.wait_for_url(lambda url: url != prev_url)
+async def nav_next(loc: Locator | Page):
+    async with nav(loc := loc_main(loc)):
+        await loc.press("ArrowRight")
+
+
+@asynccontextmanager
+async def nav(loc: Locator | Page):
+    async with (loc if isinstance(loc, Page) else loc.page).expect_navigation():
+        yield
 
 
 def loc_album_items(loc: Locator | Page) -> Locator:
@@ -141,7 +148,7 @@ def loc_item_count(loc: Locator | Page) -> Locator:
 
 
 def loc_main(loc: Locator | Page) -> Locator:
-    return loc.locator("main")
+    return loc.get_by_role("main")
 
 
 def loc_map(loc: Locator | Page) -> Locator:

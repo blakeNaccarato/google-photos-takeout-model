@@ -11,9 +11,9 @@ pyautogui.PAUSE = 0.2
 GPHOTOS_BASE_URL = "https://photos.google.com"
 STORAGE_STATE = Path("storage-state.json")
 LARGE_ALBUM_COUNT = 400
-SLOW_MO_WAIT = 500
-WAIT = 2 * SLOW_MO_WAIT
-LONG_WAIT = 5 * SLOW_MO_WAIT
+SLOW_MO_WAIT = 200
+WAIT = 1_000
+LONG_WAIT = 5_000
 TIMEOUT = 15_000
 
 
