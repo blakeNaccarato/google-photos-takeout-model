@@ -60,11 +60,12 @@ async def get_all_media_metadata(pg: Page, album: str):
         )
     await nav_first(pg)
     await loc_main(pg).get_by_label("Open info").click()
-    album_item_count = await get_item_count(pg)
     current_media_item = len(alb.media_items)
-    for _ in tqdm(range(1, current_media_item)):
+    album_item_count = await get_item_count(pg)
+    nav_next_count = album_item_count - 1
+    for _ in tqdm(range(current_media_item)):
         await nav_next(pg)
-    for _ in tqdm(range(current_media_item, album_item_count)):
+    for _ in tqdm(range(current_media_item, nav_next_count)):
         await nav_next(pg)
         alb.media_items.append(
             MediaItem(
