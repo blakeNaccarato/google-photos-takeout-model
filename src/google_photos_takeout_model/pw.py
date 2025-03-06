@@ -1,9 +1,13 @@
 from contextlib import asynccontextmanager
 from os import environ
 from pathlib import Path
+from threading import Thread
 
+import pyautogui
 from playwright.async_api import BrowserContext, Page, PlaywrightContextManager
+from pyautogui import hotkey
 
+pyautogui.PAUSE = 0.2
 GPHOTOS_BASE_URL = "https://photos.google.com"
 STORAGE_STATE = Path("storage-state.json")
 LARGE_ALBUM_COUNT = 400
@@ -42,28 +46,46 @@ async def page():
     async with context() as ctx:
         pg = await ctx.new_page()
         yield pg
-        teardown_page(pg)
-
-
-@asynccontextmanager
-async def page_and_context():
-    async with context() as ctx:
-        pg = await ctx.new_page()
-        yield pg, ctx
-        teardown_page(pg)
-
-
-async def teardown_page(pg: Page):
-    await pg.close()
+        await pg.close()
 
 
 async def log_in_if_not(pg: Page, ctx: BrowserContext):
     logged_in = not await pg.get_by_label("Sign in").count()
     if not logged_in:
-        await log_in(pg, ctx)
+        await log_in(pg)
 
 
-async def log_in(pg: Page, ctx: BrowserContext):
+async def log_in(pg: Page):
+    Thread(target=move_windows, daemon=True).start()
     await pg.goto(f"{GPHOTOS_BASE_URL}/login")
-    await pg.pause()
-    await ctx.storage_state(path=STORAGE_STATE)
+    if any(
+        [
+            await pg.get_by_role("heading", name=name, exact=True).count()
+            for name in ["Sign in", "Choose an account"]
+        ]
+    ):
+        await pg.wait_for_url("https://photos.google.com/")
+    await pg.context.storage_state(path=STORAGE_STATE)
+    # ? Zoom browser to smallest scale
+    for keys in [["Ctrl", "-"]] * 7:
+        hotkey(*keys)
+
+
+def move_windows():
+    alt_tab = ["Alt", "Tab"]
+    move_right = [
+        ["Win", "Left"],
+        ["Win", "Right"],
+        ["Win", "Up"],
+    ]
+    for keys in [
+        # ? Move browser to the right
+        *move_right,
+        # ? Move inspector to the right and unpause it
+        alt_tab,
+        *move_right,
+        ["F8"],
+        # ? Focus the browser
+        alt_tab,
+    ]:
+        hotkey(*keys)

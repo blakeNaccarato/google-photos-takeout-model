@@ -1,6 +1,9 @@
 # Auth and data
-albums*.*
+album*.*
 storage-state.json
+
+# Local environment variables
+.env
 
 # Python-generated files
 __pycache__/

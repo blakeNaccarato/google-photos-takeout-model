@@ -9,7 +9,7 @@ from google_photos_takeout_model.pw import GPHOTOS_BASE_URL
 
 
 async def main():
-    async with logged_in() as (pg, _):
+    async with logged_in() as pg:
         await pg.goto(f"{GPHOTOS_BASE_URL}/unsaved")
         options = pg.get_by_role("button", name="More options", exact=True)
         delete = pg.get_by_role("menuitem", name="Delete permanently", exact=True)

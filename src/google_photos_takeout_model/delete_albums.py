@@ -10,10 +10,10 @@ from google_photos_takeout_model import (
     Albums,
     Kinds,
     get_albums,
+    loc_more_options,
     logged_in,
     many_photos_selected,
     more_options,
-    more_options_available,
     select_all_photos,
     update_album_list,
 )
@@ -24,7 +24,7 @@ from google_photos_takeout_model.pw import TIMEOUT
 
 async def main():
     albs = get_albums()
-    async with logged_in() as (pg, _):
+    async with logged_in() as pg:
         for title, url in tqdm(albs["in"].contents.items()):
             await pg.goto(url)
             await leave_or_delete_album(title, albs, pg)
@@ -69,7 +69,7 @@ async def move_to_trash(pg: Page):
         return
     waited = 0
     while (waited < TIMEOUT) and (
-        await more_options_available(pg) or not await album_empty_after_deleting(pg)
+        await loc_more_options(pg).count() or not await album_empty_after_deleting(pg)
     ):
         waited += WAIT
         await pg.wait_for_timeout(WAIT)

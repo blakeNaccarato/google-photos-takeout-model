@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from asyncio import run
+from os import environ
+from sys import argv
 
 from playwright.async_api import Page
 from tqdm import tqdm
 
 from google_photos_takeout_model import (
-    GPHOTOS_SHARED_PERSON,
     Albums,
     Kinds,
     get_albums,
@@ -20,16 +21,19 @@ from google_photos_takeout_model.pw import GPHOTOS_BASE_URL, WAIT
 
 async def main():
     albs = get_albums()
-    async with logged_in() as (pg, _):
+    async with logged_in() as pg:
         for title, url in tqdm(albs["in"].contents.items()):
             await pg.goto(url)
             await copy_album(title, albs, pg)
 
 
 async def copy_album(title: str, albs: dict[Kinds, Albums], pg: Page):
+    gphotos_shared_person = (
+        environ.get("GPHOTOS_SHARED_PERSON") or argv[1] if len(argv) > 1 else None
+    )
     shared = (
-        await pg.get_by_role("button", name=GPHOTOS_SHARED_PERSON).count()
-        if GPHOTOS_SHARED_PERSON
+        await pg.get_by_role("button", name=gphotos_shared_person).count()
+        if gphotos_shared_person
         else False
     )
     unlv_url = pg.url

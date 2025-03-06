@@ -3,22 +3,18 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from json import dumps, loads
-from os import environ
 from pathlib import Path
 from typing import Literal, Self, TypeAlias, get_args
 
-from playwright.async_api import Page
+from playwright.async_api import Locator, Page
 
 from google_photos_takeout_model.pw import (
     LARGE_ALBUM_COUNT,
     LONG_WAIT,
     WAIT,
     log_in,
-    page_and_context,
+    page,
 )
-
-GPHOTOS_SHARED_PERSON = environ.get("GPHOTOS_SHARED_PERSON", "")
-GPHOTOS_ALBUM = environ.get("GPHOTOS_ALBUM", "")
 
 Kinds: TypeAlias = Literal[
     "copied",
@@ -85,17 +81,22 @@ def get_albums() -> dict[Kinds, Albums]:
 
 @asynccontextmanager
 async def logged_in():
-    async with page_and_context() as (pg, ctx):
-        await log_in(pg, ctx)
-        yield pg, ctx
+    async with page() as pg:
+        await log_in(pg)
+        yield pg
 
 
-async def more_options(pg: Page):
-    while not await more_options_available(pg):
+async def more_options(loc: Page | Locator):
+    if isinstance(loc, Page):
+        pg = loc
+        loc = pg.locator("*")
+    else:
+        pg = loc.page
+    while not await loc_more_options(loc).count():
         await pg.wait_for_timeout(WAIT)
-    await pg.get_by_role("button", name="More options").click()
+    await loc_more_options(loc).click()
     await pg.wait_for_timeout(WAIT)
 
 
-async def more_options_available(pg: Page):
-    return await pg.get_by_role("button", name="More options").count()
+def loc_more_options(loc: Page | Locator) -> Locator:
+    return loc.get_by_role("button", name="More options")
