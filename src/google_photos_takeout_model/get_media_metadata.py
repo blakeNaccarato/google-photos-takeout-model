@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from asyncio import run
 from contextlib import asynccontextmanager
-from json import loads
 from pathlib import Path
 from re import compile
 from sys import argv
+from typing import AsyncGenerator
 
 from playwright.async_api import Locator, Page
 from pydantic import BaseModel, Field
@@ -20,63 +20,39 @@ ALBUM = Path("album.json")
 async def main(album: str = GPHOTOS_ALBUM):
     if not album:
         raise ValueError("Album link required.")
-    async with logged_in() as pg:
-        await get_all_media_metadata(pg, album)
+    async with logged_in() as pg, album_nav(pg, album) as (alb, nav_count):
+        for _ in tqdm(range(nav_count)):
+            await get_media_metadata(pg, alb)
 
 
-async def get_image_preview_url(pg: Page):
-    return (
-        await loc_main(pg)
-        .filter(has=pg.get_by_role("img", name="Photo - "))
-        .last.locator("[src]")
-        .get_attribute("src")
+async def get_media_metadata(pg: Page, album: Album):
+    await nav_next(pg)
+    album.media_items.append(
+        MediaItem(
+            item=pg.url,
+            people=await loc_people(pg).all_inner_texts(),
+            albums=await loc_albums_containing_item(pg).all_inner_texts(),
+            details=await loc_details(pg).all_inner_texts(),
+            position=await get_position(pg),
+        )
     )
 
 
-async def get_url(loc: Locator) -> str:
-    if "(0 B)" in "".join(await loc_details(loc).all_inner_texts()):
-        return ""
-    pg = loc.page
-    async with pg.expect_download() as downloader:
-        await loc.press("Shift+D")
-    download = await downloader.value
-    await download.cancel()
-    download_url = download.url
-    return download_url
-
-
-async def get_all_media_metadata(pg: Page, album: str):
+@asynccontextmanager
+async def album_nav(pg: Page, album: str) -> AsyncGenerator[tuple[Album, int]]:
     await pg.goto(album)
-    if ALBUM.exists():
-        alb = Album(**loads(ALBUM.read_text(encoding="utf-8")))
-    else:
-        alb = Album(
-            title=(await pg.title()).removesuffix(" - Google Photos"),
-            item=pg.url,
-        )
-        ALBUM.write_text(
-            encoding="utf-8",
-            data=album_dumps(alb),
-        )
+    alb = Album(
+        title=(await pg.title()).removesuffix(" - Google Photos"),
+        item=pg.url,
+    )
     await nav_first(pg)
     await loc_main(pg).get_by_label("Open info").click()
-    current_media_item = len(alb.media_items)
     album_item_count = await get_item_count(pg)
-    nav_next_count = album_item_count - 1
-    for _ in tqdm(range(current_media_item)):
-        await nav_next(pg)
-    for _ in tqdm(range(current_media_item, nav_next_count)):
-        await nav_next(pg)
-        alb.media_items.append(
-            MediaItem(
-                item=pg.url,
-                people=await loc_people(pg).all_inner_texts(),
-                albums=await loc_albums_containing_item(pg).all_inner_texts(),
-                details=await loc_details(pg).all_inner_texts(),
-                position=await get_position(pg),
-            )
-        )
-    ALBUM.write_text(encoding="utf-8", data=album_dumps(alb))
+    nav_count = album_item_count - 1
+    try:
+        yield alb, nav_count
+    finally:
+        ALBUM.write_text(encoding="utf-8", data=album_dumps(alb))
 
 
 def loc_albums_containing_item(loc: Locator | Page) -> Locator:
@@ -111,24 +87,24 @@ async def get_position(loc: Locator | Page) -> str:
     )
 
 
-async def nav_first(loc: Locator | Page):
-    async with nav(loc):
-        await loc_album_items(loc).first.click()
+async def nav_first(pg: Page):
+    async with nav(pg):
+        await loc_album_items(pg).first.click()
 
 
-async def nav_next(loc: Locator | Page):
-    async with nav(loc := loc_main(loc)):
-        await loc.press("ArrowRight")
+async def nav_next(pg: Page):
+    async with nav(pg):
+        await pg.locator("body").press("ArrowRight")
 
 
 @asynccontextmanager
-async def nav(loc: Locator | Page):
-    async with (loc if isinstance(loc, Page) else loc.page).expect_navigation():
+async def nav(pg: Page):
+    async with pg.expect_navigation():
         yield
 
 
 def loc_album_items(loc: Locator | Page) -> Locator:
-    return loc.get_by_role("link", name=compile(r"^(?!Back|Goog).*$"))
+    return loc_main(loc).get_by_role("link", name=compile(r"^(?!Back|Goog).*$"))
 
 
 def loc_details(loc: Locator | Page):
@@ -173,6 +149,27 @@ class Album(BaseModel):
     title: str = ""
     item: str = ""
     media_items: list[MediaItem] = Field(default_factory=list)
+
+
+async def get_image_preview_url(pg: Page):
+    return (
+        await loc_main(pg)
+        .filter(has=pg.get_by_role("img", name="Photo - "))
+        .last.locator("[src]")
+        .get_attribute("src")
+    )
+
+
+async def get_url(loc: Locator) -> str:
+    if "(0 B)" in "".join(await loc_details(loc).all_inner_texts()):
+        return ""
+    pg = loc.page
+    async with pg.expect_download() as downloader:
+        await loc.press("Shift+D")
+    download = await downloader.value
+    await download.cancel()
+    download_url = download.url
+    return download_url
 
 
 if __name__ == "__main__":
