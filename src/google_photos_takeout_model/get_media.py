@@ -82,7 +82,10 @@ async def nav_next(m: Locator):
 async def get_media_item(pg: Page, album: Album):
     m = pg.get_by_role("main")
     panes = m.locator("c-wiz")
-    video = m.get_by_title("YouTube Google Photos Video Player")
+    # TODO: Detects stale video elements for a few items afterwards.
+    # TODO: Use combination of `is_enabled`, `is_visible`, or something to filter down
+    # TODO: Not a huge deal, since `Shift+D` points to downloads for pictures as well
+    video = panes.nth(1).get_by_title("YouTube Google Photos Video Player")
     info = panes.filter(has=pg.get_by_role("button", name="Close info"))
     position = pg.get_by_role("link", name="Map")
     details = (
@@ -90,7 +93,7 @@ async def get_media_item(pg: Page, album: Album):
     )
     if "(0 B)" in "".join(details):
         download_url = ""
-    elif await video.is_visible():
+    elif await video.count():
         async with pg.expect_download() as downloader:
             await m.press("Shift+D")
         download = await downloader.value
