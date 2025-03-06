@@ -8,30 +8,28 @@ from pathlib import Path
 from sys import argv
 
 from playwright.async_api import Locator, Page
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 from google_photos_takeout_model import dumps, logged_in
 
 
 class MediaItem(BaseModel):
-    item: str
-    download: str
-    people: list[str]
-    albums: list[str]
-    details: list[str]
-    position: str
+    item: str = ""
+    download: str = ""
+    people: list[str] = Field(default_factory=list)
+    albums: list[str] = Field(default_factory=list)
+    details: list[str] = Field(default_factory=list)
+    position: str = ""
 
 
 class Album(BaseModel):
-    title: str
-    item: str
-    media_items: list[MediaItem]
+    title: str = ""
+    item: str = ""
+    media_items: list[MediaItem] = Field(default_factory=list)
 
 
 ALBUM = Path("album.json")
-if not ALBUM.exists():
-    ALBUM.write_text(encoding="utf-8", data="[]")
 
 
 async def main():
@@ -43,8 +41,22 @@ async def get_all_media(pg: Page):
     album_url = argv[1] if len(argv) > 1 else environ["GPHOTOS_ALBUM"]
     m = pg.get_by_role("main")
     loc_desc = "meta[property='og:description'][content*='items added to shared album']"
-    album = Album(**loads(ALBUM.read_text(encoding="utf-8")))
     await pg.goto(album_url)
+    if ALBUM.exists():
+        album = Album(**loads(ALBUM.read_text(encoding="utf-8")))
+    else:
+        album = Album(
+            title=(await pg.title()).removesuffix(" - Google Photos"),
+            item=pg.url,
+        )
+        ALBUM.write_text(
+            encoding="utf-8",
+            data=dumps(
+                album.model_dump(),
+                indent=2,
+                ensure_ascii=False,
+            ),
+        )
     await pg.get_by_role("link", name=re.compile(r"^(?!Back|Goog).*$")).first.click()
     await m.get_by_label("Open info").click()
     current_media_item = len(album.media_items)
