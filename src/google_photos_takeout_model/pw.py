@@ -64,7 +64,7 @@ async def log_in(pg: Page):
             for name in ["Sign in", "Choose an account"]
         ]
     ):
-        await pg.wait_for_url("https://photos.google.com/")
+        await pg.wait_for_url("https://photos.google.com/", timeout=90_000)
     await pg.context.storage_state(path=STORAGE_STATE)
     # ? Zoom browser to smallest scale
     for keys in [["Ctrl", "-"]] * 7:

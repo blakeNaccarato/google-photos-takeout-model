@@ -60,15 +60,14 @@ async def get_all_media(pg: Page):
     await pg.get_by_role("link", name=re.compile(r"^(?!Back|Goog).*$")).first.click()
     await m.get_by_label("Open info").click()
     current_media_item = len(album.media_items)
-    last_completed_media_item = current_media_item - 1
-    for _ in tqdm(range(last_completed_media_item)):
-        await nav_next(m)
     media_item_count = (
         int(desc.split()[0])
         if (desc := await pg.locator(loc_desc).get_attribute("content"))
         else 0
     )
-    for _ in tqdm(range(last_completed_media_item, media_item_count)):
+    for _ in tqdm(range(current_media_item)):
+        await nav_next(m)
+    for _ in tqdm(range(current_media_item, media_item_count)):
         await nav_next(m)
         await get_media_item(pg, album)
 
