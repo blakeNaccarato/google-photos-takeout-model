@@ -124,7 +124,9 @@ async def get_media_item(pg: Page, album: Album):
             ),
         )
     )
-    ALBUM.write_text(encoding="utf-8", data=dumps(album, indent=2, ensure_ascii=False))
+    ALBUM.write_text(
+        encoding="utf-8", data=dumps(album.model_dump(), indent=2, ensure_ascii=False)
+    )
 
 
 async def get_css_attr(locator: Locator, attr: str = "") -> str:
