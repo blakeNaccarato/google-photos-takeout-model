@@ -4,17 +4,19 @@ from pathlib import Path
 from threading import Thread
 
 import pyautogui
-from playwright.async_api import BrowserContext, Page, PlaywrightContextManager
+from playwright.async_api import Locator, PlaywrightContextManager
 from pyautogui import hotkey
 
 pyautogui.PAUSE = 0.2
 GPHOTOS_BASE_URL = "https://photos.google.com"
 STORAGE_STATE = Path("storage-state.json")
-LARGE_ALBUM_COUNT = 400
-SLOW_MO_WAIT = 200
-WAIT = 1_000
+ITEM_SELECTION_THRESHOLD = 491
+"""Behavior varies when selections exceed this threshold, resulting in batching."""
+SLOW_MO_WAIT = 0
+WAIT = 600
 LONG_WAIT = 5_000
-TIMEOUT = 15_000
+DELETE_ALBUM_TIMEOUT = 15_000
+TIMEOUT = 1_000
 
 
 @asynccontextmanager
@@ -26,9 +28,10 @@ async def browser():
             channel="chrome",
             headless=False,
             slow_mo=SLOW_MO_WAIT,
+            timeout=TIMEOUT,
         )
         yield browser
-        browser.close()
+        await browser.close()
 
 
 @asynccontextmanager
@@ -42,30 +45,31 @@ async def context():
 
 
 @asynccontextmanager
-async def page():
+async def locator():
     async with context() as ctx:
         pg = await ctx.new_page()
-        yield pg
-        await pg.close()
+        loc = pg.locator("*")
+        yield loc
+        await loc.page.close()
 
 
-async def log_in_if_not(pg: Page, ctx: BrowserContext):
-    logged_in = not await pg.get_by_label("Sign in").count()
+async def log_in_if_not(loc: Locator):
+    logged_in = not await loc.get_by_label("Sign in").count()
     if not logged_in:
-        await log_in(pg)
+        await log_in(loc)
 
 
-async def log_in(pg: Page):
+async def log_in(loc: Locator):
     Thread(target=move_windows, daemon=True).start()
-    await pg.goto(f"{GPHOTOS_BASE_URL}/login")
+    await loc.page.goto(f"{GPHOTOS_BASE_URL}/login")
     if any(
         [
-            await pg.get_by_role("heading", name=name, exact=True).count()
+            await loc.page.get_by_role("heading", name=name, exact=True).count()
             for name in ["Sign in", "Choose an account"]
         ]
     ):
-        await pg.wait_for_url("https://photos.google.com/", timeout=90_000)
-    await pg.context.storage_state(path=STORAGE_STATE)
+        await loc.page.wait_for_url("https://photos.google.com/", timeout=90_000)
+    await loc.page.context.storage_state(path=STORAGE_STATE)
     # ? Zoom browser to smallest scale
     for keys in [["Ctrl", "-"]] * 7:
         hotkey(*keys)

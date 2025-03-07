@@ -86,16 +86,16 @@ class MediaItem(ToCamelBaseModel):
         # sourcery skip: merge-else-if-into-elif, remove-pass-elif
         if (metadata_path := path.with_name(f"{path.name}.json")).exists():
             pass
-        elif (metadata_path := path.with_name(f"{path.name}.jpg.json")).exists():
+        elif (metadata_path := path.with_name(f"{path.name}.jloc.page.json")).exists():
             pass
         elif (metadata_path := path.with_name(f"{path.stem}.json")).exists():
             pass
-        elif (metadata_path := path.with_name(f"{path.stem}.jpg.json")).exists():
+        elif (metadata_path := path.with_name(f"{path.stem}.jloc.page.json")).exists():
             pass
         else:
             if path.stem.endswith("-edited"):
                 metadata_path = path.with_name(
-                    f"{path.stem.removesuffix("-edited")}{path.suffix}.json"
+                    f"{path.stem.removesuffix('-edited')}{path.suffix}.json"
                 )
             elif len(path.name) > JSON_STEM_MAX_LENGTH:
                 metadata_path = path.with_name(
@@ -104,13 +104,13 @@ class MediaItem(ToCamelBaseModel):
             elif stem := match(PARENTHESIZED_MEDIA_ITEM_STEM, path.stem):
                 if (
                     metadata_path := path.with_name(
-                        f"{stem["name"]}{path.suffix}({stem["num"]}).json"
+                        f"{stem['name']}{path.suffix}({stem['num']}).json"
                     )
                 ).exists():
                     pass
                 elif (
                     metadata_path := path.with_name(
-                        f"{stem["name"]}{path.suffix}.jpg({stem["num"]}).json"
+                        f"{stem['name']}{path.suffix}.jpg({stem['num']}).json"
                     )
                 ).exists():
                     pass

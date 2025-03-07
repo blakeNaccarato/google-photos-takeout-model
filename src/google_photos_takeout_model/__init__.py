@@ -6,14 +6,14 @@ from json import dumps, loads
 from pathlib import Path
 from typing import Literal, Self, TypeAlias, get_args
 
-from playwright.async_api import Locator, Page
+from playwright.async_api import Locator
 
 from google_photos_takeout_model.pw import (
-    LARGE_ALBUM_COUNT,
+    ITEM_SELECTION_THRESHOLD,
     LONG_WAIT,
     WAIT,
+    locator,
     log_in,
-    page,
 )
 
 Kinds: TypeAlias = Literal[
@@ -40,27 +40,27 @@ class Albums:
         return cls(path, loads(path.read_text(encoding="utf-8")))
 
 
-async def select_all_photos(pg: Page):
+async def select_all_photos(loc: Locator):
     # ? Select first checkbox
-    await pg.get_by_role("checkbox").first.click()
+    await loc.page.get_by_role("checkbox").first.click()
     # ? Move to page bottom to show last checkbox. Do twice since it's flaky
-    await pg.keyboard.press("End")
-    await pg.wait_for_timeout(WAIT)
-    await pg.keyboard.press("Home")
-    await pg.wait_for_timeout(WAIT)
-    await pg.keyboard.press("End")
-    await pg.wait_for_timeout(LONG_WAIT)
+    await loc.page.keyboard.press("End")
+    await loc.page.wait_for_timeout(WAIT)
+    await loc.page.keyboard.press("Home")
+    await loc.page.wait_for_timeout(WAIT)
+    await loc.page.keyboard.press("End")
+    await loc.page.wait_for_timeout(LONG_WAIT)
     # ? Shift+select last checkbox to select all images
-    if not await (last_box := pg.get_by_role("checkbox").last).is_checked():
-        await pg.keyboard.down("Shift")
+    if not await (last_box := loc.page.get_by_role("checkbox").last).is_checked():
+        await loc.page.keyboard.down("Shift")
         await last_box.click()
-        await pg.keyboard.up("Shift")
-    await pg.wait_for_timeout(WAIT)
+        await loc.page.keyboard.up("Shift")
+    await loc.page.wait_for_timeout(WAIT)
 
 
-async def many_photos_selected(pg: Page) -> bool:
-    return bool(selected := await pg.get_by_text("selected").text_content()) and (
-        int(selected.split()[0]) > LARGE_ALBUM_COUNT
+async def many_photos_selected(loc: Locator) -> bool:
+    return bool(selected := await loc.page.get_by_text("selected").text_content()) and (
+        int(selected.split()[0]) > ITEM_SELECTION_THRESHOLD
     )
 
 
@@ -81,22 +81,17 @@ def get_albums() -> dict[Kinds, Albums]:
 
 @asynccontextmanager
 async def logged_in():
-    async with page() as pg:
-        await log_in(pg)
-        yield pg
+    async with locator() as loc:
+        await log_in(loc)
+        yield loc
 
 
-async def more_options(loc: Page | Locator):
-    if isinstance(loc, Page):
-        pg = loc
-        loc = pg.locator("*")
-    else:
-        pg = loc.page
+async def more_options(loc: Locator):
     while not await loc_more_options(loc).count():
-        await pg.wait_for_timeout(WAIT)
+        await loc.page.wait_for_timeout(WAIT)
     await loc_more_options(loc).click()
-    await pg.wait_for_timeout(WAIT)
+    await loc.page.wait_for_timeout(WAIT)
 
 
-def loc_more_options(loc: Page | Locator) -> Locator:
+def loc_more_options(loc: Locator) -> Locator:
     return loc.get_by_role("button", name="More options")

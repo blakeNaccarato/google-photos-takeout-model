@@ -1,12 +1,12 @@
 import asyncio
 
-from google_photos_takeout_model import pw
+from google_photos_takeout_model import locator
 
 
 async def main():
-    async with pw.page() as page:
-        await page.goto("https://bot-detector.rebrowser.net")
-        await page.pause()
+    async with locator() as loc:
+        await loc.page.goto("https://bot-detector.rebrowser.net")
+        await loc.page.pause()
 
 
 if __name__ == "__main__":

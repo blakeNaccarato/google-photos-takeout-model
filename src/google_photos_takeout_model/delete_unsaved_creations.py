@@ -9,10 +9,10 @@ from google_photos_takeout_model.pw import GPHOTOS_BASE_URL
 
 
 async def main():
-    async with logged_in() as pg:
-        await pg.goto(f"{GPHOTOS_BASE_URL}/unsaved")
-        options = pg.get_by_role("button", name="More options", exact=True)
-        delete = pg.get_by_role("menuitem", name="Delete permanently", exact=True)
+    async with logged_in() as loc:
+        await loc.page.goto(f"{GPHOTOS_BASE_URL}/unsaved")
+        options = loc.page.get_by_role("button", name="More options", exact=True)
+        delete = loc.page.get_by_role("menuitem", name="Delete permanently", exact=True)
         n = -1
         while (n := n + 1) < 1000 and await options.count():
             await options.nth(n).hover(force=True)

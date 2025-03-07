@@ -257,7 +257,6 @@
   //* Automatically synchronized environment variables
   "terminal.integrated.env.linux": {
     "COVERAGE_CORE": "sysmon",
-    "PWDEBUG": "1",
     "PYDEVD_DISABLE_FILE_VALIDATION": "1",
     "PYRIGHT_PYTHON_PYLANCE_VERSION": "2025.2.1",
     "PYTHONIOENCODING": "utf-8:strict",
@@ -267,7 +266,6 @@
   },
   "terminal.integrated.env.osx": {
     "COVERAGE_CORE": "sysmon",
-    "PWDEBUG": "1",
     "PYDEVD_DISABLE_FILE_VALIDATION": "1",
     "PYRIGHT_PYTHON_PYLANCE_VERSION": "2025.2.1",
     "PYTHONIOENCODING": "utf-8:strict",
@@ -277,7 +275,6 @@
   },
   "terminal.integrated.env.windows": {
     "COVERAGE_CORE": "sysmon",
-    "PWDEBUG": "1",
     "PYDEVD_DISABLE_FILE_VALIDATION": "1",
     "PYRIGHT_PYTHON_PYLANCE_VERSION": "2025.2.1",
     "PYTHONIOENCODING": "utf-8:strict",

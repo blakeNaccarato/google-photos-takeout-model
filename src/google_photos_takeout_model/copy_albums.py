@@ -4,7 +4,7 @@ from asyncio import run
 from os import environ
 from sys import argv
 
-from playwright.async_api import Page
+from playwright.async_api import Locator
 from tqdm import tqdm
 
 from google_photos_takeout_model import (
@@ -21,43 +21,43 @@ from google_photos_takeout_model.pw import GPHOTOS_BASE_URL, WAIT
 
 async def main():
     albs = get_albums()
-    async with logged_in() as pg:
+    async with logged_in() as loc:
         for title, url in tqdm(albs["in"].contents.items()):
-            await pg.goto(url)
-            await copy_album(title, albs, pg)
+            await loc.page.goto(url)
+            await copy_album(title, albs, loc)
 
 
-async def copy_album(title: str, albs: dict[Kinds, Albums], pg: Page):
+async def copy_album(title: str, albs: dict[Kinds, Albums], loc: Locator):
     gphotos_shared_person = (
         environ.get("GPHOTOS_SHARED_PERSON") or argv[1] if len(argv) > 1 else None
     )
     shared = (
-        await pg.get_by_role("button", name=gphotos_shared_person).count()
+        await loc.page.get_by_role("button", name=gphotos_shared_person).count()
         if gphotos_shared_person
         else False
     )
-    unlv_url = pg.url
-    await select_all_photos(pg)
-    if await many_photos_selected(pg):
-        return update_album_list(albs["large"], title, pg.url)
+    unlv_url = loc.page.url
+    await select_all_photos(loc)
+    if await many_photos_selected(loc):
+        return update_album_list(albs["large"], title, loc.page.url)
     # ? Add all images to a new album
-    await pg.get_by_label("Add to album", exact=True).click()
-    await pg.get_by_role("menu").get_by_text("Album", exact=True).click()
-    await pg.wait_for_timeout(WAIT)
-    await pg.get_by_role("option", name="New album").click()
+    await loc.page.get_by_label("Add to album", exact=True).click()
+    await loc.page.get_by_role("menu").get_by_text("Album", exact=True).click()
+    await loc.page.wait_for_timeout(WAIT)
+    await loc.page.get_by_role("option", name="New album").click()
     # ? Wait for the album to be created
-    await pg.wait_for_url(f"{GPHOTOS_BASE_URL}/album/*", timeout=60_000)
+    await loc.page.wait_for_url(f"{GPHOTOS_BASE_URL}/album/*", timeout=60_000)
     # ? Give the new album the same title as the shared album
-    album_title = pg.get_by_placeholder("Add a title")
+    album_title = loc.page.get_by_placeholder("Add a title")
     await album_title.click()
     await album_title.fill(title)
-    await pg.get_by_label("Done").click()
+    await loc.page.get_by_label("Done").click()
     # ? Update album list
-    update_album_list(albs["copied"], title, pg.url)
+    update_album_list(albs["copied"], title, loc.page.url)
     # ? Record albums that were shared
     if shared:
         update_album_list(albs["shared"], title, unlv_url)
-        update_album_list(albs["were-shared"], title, pg.url)
+        update_album_list(albs["were-shared"], title, loc.page.url)
 
 
 if __name__ == "__main__":
