@@ -6,9 +6,10 @@ readme = "README.md"
 authors = [{ name = "blakeNaccarato", email = "blake.naccarato@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
+    "cappa>=0.26.6",
     "more-itertools>=10.5.0",
- "pydantic>=2.10.0",
- "stamina>=24.3.0",
+    "pydantic>=2.10.0",
+    "stamina>=24.3.0",
 ]
 
 [project.scripts]

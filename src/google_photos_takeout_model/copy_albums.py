@@ -11,12 +11,11 @@ from google_photos_takeout_model import (
     Albums,
     Kinds,
     get_albums,
-    logged_in,
     many_photos_selected,
     select_all_photos,
     update_album_list,
 )
-from google_photos_takeout_model.pw import GPHOTOS_BASE_URL, WAIT
+from google_photos_takeout_model.pw import GPHOTOS_BASE_URL, WAIT, logged_in
 
 
 async def main():

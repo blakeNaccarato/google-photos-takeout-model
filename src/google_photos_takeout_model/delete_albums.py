@@ -11,13 +11,12 @@ from google_photos_takeout_model import (
     Kinds,
     get_albums,
     loc_more_options,
-    logged_in,
     many_photos_selected,
     more_options,
     select_all_photos,
     update_album_list,
 )
-from google_photos_takeout_model.pw import DELETE_ALBUM_TIMEOUT
+from google_photos_takeout_model.pw import DELETE_ALBUM_TIMEOUT, logged_in
 
 # TODO: Implement as finite state machine, e.g. awaiting empty album depends on state.
 

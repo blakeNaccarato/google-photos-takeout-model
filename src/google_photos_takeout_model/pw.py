@@ -1,11 +1,13 @@
+from asyncio import TaskGroup
 from contextlib import asynccontextmanager
-from os import environ
 from pathlib import Path
-from threading import Thread
+from typing import Any, Callable, Coroutine, TypeAlias
 
 import pyautogui
-from playwright.async_api import Locator, PlaywrightContextManager
-from pyautogui import hotkey
+from more_itertools import first
+from playwright.async_api import Locator, PlaywrightContextManager, ViewportSize
+
+StringProcessor: TypeAlias = Callable[[str, Locator], Coroutine[Any, Any, None]]
 
 pyautogui.PAUSE = 0.2
 GPHOTOS_BASE_URL = "https://photos.google.com"
@@ -19,14 +21,34 @@ DELETE_ALBUM_TIMEOUT = 15_000
 TIMEOUT = 1_000
 
 
+async def process_strings(
+    f: StringProcessor, strings: list[str], debug: bool = False, headless: bool = False
+):
+    async with logged_in():
+        pass
+    if debug:
+        return await process_string(f, first(strings))
+    async with TaskGroup() as tg:
+        for string in strings:
+            tg.create_task(process_string(f, string))
+
+
+async def process_string(f: StringProcessor, string: str):
+    async with locator() as loc:
+        await f(string, loc)
+
+
 @asynccontextmanager
-async def browser():
-    environ["PWDEBUG"] = "1"
+async def browser(headless: bool = True):
     async with PlaywrightContextManager() as pw:
         browser = await pw.chromium.launch(
-            args=["--disable-blink-features=AutomationControlled"],
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--hide-scrollbars",
+                "--mute-audio",
+            ],
             channel="chrome",
-            headless=False,
+            headless=headless,
             slow_mo=SLOW_MO_WAIT,
             timeout=TIMEOUT,
         )
@@ -35,32 +57,35 @@ async def browser():
 
 
 @asynccontextmanager
-async def context():
+async def context(headless: bool = True):
     if not STORAGE_STATE.exists():
         STORAGE_STATE.write_text(encoding="utf-8", data="{}")
-    async with browser() as b:
-        ctx = await b.new_context(storage_state=STORAGE_STATE, no_viewport=True)
+    async with browser(headless) as b:
+        ctx = await b.new_context(
+            storage_state=STORAGE_STATE,
+            viewport=ViewportSize(width=1920, height=5000) if headless else None,
+        )
         yield ctx
         await ctx.close()
 
 
 @asynccontextmanager
-async def locator():
-    async with context() as ctx:
+async def locator(headless: bool = True):
+    async with context(headless) as ctx:
         pg = await ctx.new_page()
         loc = pg.locator("*")
         yield loc
         await loc.page.close()
 
 
-async def log_in_if_not(loc: Locator):
-    logged_in = not await loc.get_by_label("Sign in").count()
-    if not logged_in:
+@asynccontextmanager
+async def logged_in(headless: bool = False):
+    async with locator(headless) as loc:
         await log_in(loc)
+        yield loc
 
 
-async def log_in(loc: Locator):
-    Thread(target=move_windows, daemon=True).start()
+async def log_in(loc: Locator):  # sourcery skip: comprehension-to-generator
     await loc.page.goto(f"{GPHOTOS_BASE_URL}/login")
     if any(
         [
@@ -70,26 +95,3 @@ async def log_in(loc: Locator):
     ):
         await loc.page.wait_for_url("https://photos.google.com/", timeout=90_000)
     await loc.page.context.storage_state(path=STORAGE_STATE)
-    # ? Zoom browser to smallest scale
-    for keys in [["Ctrl", "-"]] * 7:
-        hotkey(*keys)
-
-
-def move_windows():
-    alt_tab = ["Alt", "Tab"]
-    move_right = [
-        ["Win", "Left"],
-        ["Win", "Right"],
-        ["Win", "Up"],
-    ]
-    for keys in [
-        # ? Move browser to the right
-        *move_right,
-        # ? Move inspector to the right and unpause it
-        alt_tab,
-        *move_right,
-        ["F8"],
-        # ? Focus the browser
-        alt_tab,
-    ]:
-        hotkey(*keys)

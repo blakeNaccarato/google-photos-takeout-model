@@ -13,20 +13,19 @@ from pydantic import BaseModel, Field
 from stamina import retry
 from tqdm import tqdm
 
-from google_photos_takeout_model import WAIT, dumps, logged_in
-from google_photos_takeout_model.pw import TIMEOUT
+from google_photos_takeout_model import WAIT, dumps
+from google_photos_takeout_model.pw import TIMEOUT, process_strings
 
 GPHOTOS_ALBUM = argv[1] if len(argv) > 1 else ""
 ALBUM = Path("album.json")
 
 
-async def main(album: str = GPHOTOS_ALBUM):
-    if not album:
-        raise ValueError("Album link required.")
-    async with (
-        logged_in() as loc,
-        album_nav(loc, album) as (alb, nav_count),
-    ):
+async def main():
+    await process_strings(get_media_metadata, argv[1:])
+
+
+async def get_media_metadata(album: str, loc: Locator):
+    async with album_nav(loc, album) as (alb, nav_count):
         for _ in tqdm(range(nav_count)):
             alb.media_items.append(await get_media_item_metadata(loc))
             await nav_next(loc)
@@ -45,15 +44,17 @@ async def get_media_item_metadata(loc: Locator) -> MediaItemMetadata:
 @asynccontextmanager
 async def album_nav(loc: Locator, album: str) -> AsyncGenerator[tuple[Album, int]]:
     await loc.page.goto(album)
-    if False and ALBUM.exists():
-        prev_album = Album(**loads(ALBUM.read_text(encoding="utf-8")))
+    title = (await loc.page.title()).removesuffix(" - Google Photos")
+    album_path = Path(f"{title}.json")
+    if False and album_path.exists():
+        prev_album = Album(**loads(album_path.read_text(encoding="utf-8")))
         if prev_album.item == loc.page.url:
             alb = prev_album
         else:
             raise ValueError("Album link mismatch.")
     else:
         alb = Album(
-            title=(await loc.page.title()).removesuffix(" - Google Photos"),
+            title=title,
             item=loc.page.url,
         )
     album_item_count = await get_item_count(loc)
@@ -62,7 +63,7 @@ async def album_nav(loc: Locator, album: str) -> AsyncGenerator[tuple[Album, int
     try:
         yield alb, nav_count
     finally:
-        ALBUM.write_text(
+        album_path.write_text(
             encoding="utf-8",
             data=dumps(
                 alb.model_dump(),
@@ -128,8 +129,7 @@ async def get_video_source(loc: Locator, details: list[str]) -> str:
         await loc.press("Shift+D")
     download = await downloader.value
     await download.cancel()
-    download_url = download.url
-    return download_url
+    return download.url
 
 
 def loc_albums_containing_item(loc: Locator) -> Locator:
@@ -178,8 +178,7 @@ def loc_people(loc: Locator) -> Locator:
 
 
 def loc_position(loc: Locator) -> Locator:
-    position = loc_map(loc).locator("[position]").first
-    return position
+    return loc_map(loc).locator("[position]").first
 
 
 class MediaItemMetadata(BaseModel):

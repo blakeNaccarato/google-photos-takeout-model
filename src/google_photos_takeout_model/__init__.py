@@ -1,6 +1,5 @@
 """Model for Google Takeout data for Google Photos."""
 
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from json import dumps, loads
 from pathlib import Path
@@ -12,8 +11,6 @@ from google_photos_takeout_model.pw import (
     ITEM_SELECTION_THRESHOLD,
     LONG_WAIT,
     WAIT,
-    locator,
-    log_in,
 )
 
 Kinds: TypeAlias = Literal[
@@ -73,17 +70,10 @@ def update_album_list(albums: Albums, title: str, url: str):
 
 
 def get_albums() -> dict[Kinds, Albums]:
-    albs: dict[Kinds, Albums] = {}
-    for kind in kinds:
-        albs[kind] = Albums.from_path(Path(f"albums-{kind}.json"))
+    albs: dict[Kinds, Albums] = {
+        kind: Albums.from_path(Path(f"albums-{kind}.json")) for kind in kinds
+    }
     return albs
-
-
-@asynccontextmanager
-async def logged_in():
-    async with locator() as loc:
-        await log_in(loc)
-        yield loc
 
 
 async def more_options(loc: Locator):

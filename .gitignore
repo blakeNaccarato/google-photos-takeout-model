@@ -1,6 +1,9 @@
+# Logs
+*.log
+
 # Auth and data
 album*.*
-storage-state.json
+storage-state*.json
 
 # Local environment variables
 .env
