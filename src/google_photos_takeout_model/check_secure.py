@@ -1,6 +1,6 @@
 import asyncio
 
-from google_photos_takeout_model import locator
+from google_photos_takeout_model.pw import locator
 
 
 async def main():

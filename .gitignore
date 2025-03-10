@@ -3,6 +3,7 @@
 
 # Auth and data
 album*.*
+photos*.json
 storage-state*.json
 
 # Local environment variables

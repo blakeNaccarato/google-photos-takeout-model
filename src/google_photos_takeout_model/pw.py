@@ -1,13 +1,12 @@
-from asyncio import TaskGroup
 from contextlib import asynccontextmanager
+from os import environ
 from pathlib import Path
-from typing import Any, Callable, Coroutine, TypeAlias
 
 import pyautogui
-from more_itertools import first
 from playwright.async_api import Locator, PlaywrightContextManager, ViewportSize
 
-StringProcessor: TypeAlias = Callable[[str, Locator], Coroutine[Any, Any, None]]
+EMAIL = environ["GPHOTOS_EMAIL"]
+PASSWORD = environ["GPHOTOS_PASSWORD"]
 
 pyautogui.PAUSE = 0.2
 GPHOTOS_BASE_URL = "https://photos.google.com"
@@ -19,23 +18,8 @@ WAIT = 600
 LONG_WAIT = 5_000
 DELETE_ALBUM_TIMEOUT = 15_000
 TIMEOUT = 1_000
-
-
-async def process_strings(
-    f: StringProcessor, strings: list[str], debug: bool = False, headless: bool = False
-):
-    async with logged_in():
-        pass
-    if debug:
-        return await process_string(f, first(strings))
-    async with TaskGroup() as tg:
-        for string in strings:
-            tg.create_task(process_string(f, string))
-
-
-async def process_string(f: StringProcessor, string: str):
-    async with locator() as loc:
-        await f(string, loc)
+NAV_TIMEOUT = 5_000
+LOGIN_TIMEOUT = 30_000
 
 
 @asynccontextmanager
@@ -57,21 +41,22 @@ async def browser(headless: bool = True):
 
 
 @asynccontextmanager
-async def context(headless: bool = True):
+async def context(headless: bool = True, login: bool = False):
     if not STORAGE_STATE.exists():
         STORAGE_STATE.write_text(encoding="utf-8", data="{}")
-    async with browser(headless) as b:
+    async with browser(headless=False if login else headless) as b:
         ctx = await b.new_context(
+            reduced_motion="reduce",
             storage_state=STORAGE_STATE,
-            viewport=ViewportSize(width=1920, height=5000) if headless else None,
+            viewport=None if login else ViewportSize(width=1920, height=5000),
         )
         yield ctx
         await ctx.close()
 
 
 @asynccontextmanager
-async def locator(headless: bool = True):
-    async with context(headless) as ctx:
+async def locator(headless: bool = True, login: bool = False):
+    async with context(headless, login) as ctx:
         pg = await ctx.new_page()
         loc = pg.locator("*")
         yield loc
@@ -79,19 +64,39 @@ async def locator(headless: bool = True):
 
 
 @asynccontextmanager
-async def logged_in(headless: bool = False):
-    async with locator(headless) as loc:
+async def logged_in():
+    async with locator(login=True) as loc:
         await log_in(loc)
         yield loc
 
 
-async def log_in(loc: Locator):  # sourcery skip: comprehension-to-generator
-    await loc.page.goto(f"{GPHOTOS_BASE_URL}/login")
-    if any(
-        [
-            await loc.page.get_by_role("heading", name=name, exact=True).count()
-            for name in ["Sign in", "Choose an account"]
-        ]
+async def log_in(loc: Locator):
+    async with loc.page.expect_navigation(
+        url=f"{GPHOTOS_BASE_URL}/", timeout=LOGIN_TIMEOUT
     ):
-        await loc.page.wait_for_url("https://photos.google.com/", timeout=90_000)
+        await loc.page.goto(f"{GPHOTOS_BASE_URL}/login")
+        if await loc_exact_heading(loc, "Sign in").count():
+            await loc.get_by_label("Email or phone", exact=True).fill(EMAIL)
+            await loc_next(loc).click()
+            await loc_password(loc).fill(PASSWORD)
+            await loc_next(loc).click()
+            if await loc.get_by_text("2-Step Verification", exact=True).count():
+                pass
+        elif await loc_exact_heading(loc, "Choose an account").count():
+            await loc.page.pause()  # TODO: Fix
+            await loc.get_by_role("link", name="Blake Naccarato").click()  # TODO: Fix
+            await loc_password(loc).fill(PASSWORD)
+            await loc_next(loc).click()
     await loc.page.context.storage_state(path=STORAGE_STATE)
+
+
+def loc_password(loc: Locator) -> Locator:
+    return loc.get_by_label("Enter your password", exact=True)
+
+
+def loc_next(loc: Locator) -> Locator:
+    return loc.get_by_role("button", name="Next", exact=True)
+
+
+def loc_exact_heading(loc: Locator, name: str) -> Locator:
+    return loc.page.get_by_role("heading", name=name, exact=True)
