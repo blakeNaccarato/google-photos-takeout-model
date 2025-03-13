@@ -1,18 +1,22 @@
-from asyncio import TaskGroup, run, sleep
+from __future__ import annotations
+
+from asyncio import Lock, Task, TaskGroup, run, sleep
 from collections.abc import AsyncGenerator, Callable, Coroutine, Generator
 from contextlib import asynccontextmanager, contextmanager
 from functools import wraps
+from itertools import cycle
 from json import loads
 from pathlib import Path
 from re import compile  # noqa: A004
 from sys import argv
-from typing import Literal, TypeVar
+from typing import Any, Literal, TypeVar
 
 from playwright.async_api import Locator, TimeoutError  # noqa: A004
 from pydantic import BaseModel, Field
 from stamina import retry
 from stamina.instrumentation import set_on_retry_hooks
-from tqdm import tqdm
+from tqdm.asyncio import tqdm as atqdm
+from tqdm.std import tqdm
 
 from google_photos_takeout_model import WAIT, dumps
 from google_photos_takeout_model.pw import (
@@ -79,6 +83,7 @@ async def reveal_info(loc):
 
 
 async def process_album(url: str, overwrite: bool):
+    # TODO: Fix
     async with locator() as loc, album(loc, url) as alb:
         meta = alb.media_items_metadata
         items = len(meta)
@@ -90,14 +95,14 @@ async def process_album(url: str, overwrite: bool):
         if last_item_done < 0:
             async with expect_navigation(loc):
                 await click_first_photo(loc)
-            meta[0] = await get_media_item_metadata(loc)
+            meta[0] = await update_media_item_metadata(loc)
             last_item_done = 0
         else:
             await slow_retry(TimeoutError)(loc.page.goto)(meta[last_item_done].item)
         for item in tqdm(range(last_item_done + 1, items)):
             async with expect_navigation(loc):
                 await loc_main(loc).press("ArrowRight")
-            meta[item] = await get_media_item_metadata(loc)
+            meta[item] = await update_media_item_metadata(loc)
 
 
 @quick_retry(RuntimeError, TimeoutError)
@@ -106,7 +111,49 @@ async def click_first_photo(loc):
 
 
 @asynccontextmanager
+async def albums(
+    locs: cycle[tuple[Locator, Lock]], progress: atqdm, urls: list[str]
+) -> AsyncGenerator[list[Album]]:
+    progress.total += len(urls)
+    tasks: list[Task[tuple[Album, Path]]] = []
+    async with TaskGroup() as tg:
+        tasks.extend(
+            tg.create_task(get_album(loc, lock, url))
+            for url, (loc, lock) in zip(urls, locs, strict=False)
+        )
+        add_progress_callbacks(progress, tasks)
+    progress.total -= len(urls)
+    albums = [task.result() for task in tasks]
+    try:
+        yield [album for album, _ in albums]
+    finally:
+        for album, path in albums:
+            write_album(path, album)
+
+
+def add_progress_callbacks(progress: atqdm, tasks: list[Task[Any]]):
+    update_progress = get_progress_updater(progress)
+    for task in tasks:
+        task.add_done_callback(update_progress)
+
+
+def get_progress_updater(progress: atqdm) -> Callable[[Task[Any]], None]:
+    def update_progress(_task: Task[Any]):
+        progress.update()
+
+    return update_progress
+
+
+@asynccontextmanager
 async def album(loc: Locator, url: str) -> AsyncGenerator[Album]:
+    alb, path = await get_album(loc, Lock(), url)
+    try:
+        yield alb
+    finally:
+        write_album(path, alb)
+
+
+async def get_album(loc: Locator, lock: Lock, url: str) -> tuple[Album, Path]:
     await slow_retry(TimeoutError)(loc.page.goto)(url)
     title = (await loc.page.title()).removesuffix(" - Google Photos")
     path = Path(f"{title}.json")
@@ -115,13 +162,11 @@ async def album(loc: Locator, url: str) -> AsyncGenerator[Album]:
         if path.exists()
         else Album(title=title, item=url)
     )
-    items = await get_item_count(loc)
+    async with lock:
+        items = await get_item_count(loc)
     if not len(alb.media_items_metadata):
         alb.media_items_metadata.extend(MediaItemMetadata() for _ in range(items))
-    try:
-        yield alb
-    finally:
-        write_album(path, alb)
+    return (alb, path)
 
 
 @contextmanager
@@ -147,7 +192,8 @@ async def expect_navigation(loc: Locator):
 
 
 @slow_retry(RuntimeError, TimeoutError)
-async def get_media_item_metadata(loc: Locator) -> MediaItemMetadata:
+async def update_media_item_metadata(loc: Locator, item: MediaItemMetadata):
+    # TODO: Handle 404
     if not (albums := await loc_albums_containing_item(loc).all_inner_texts()):
         raise RuntimeError("Albums element not loaded.")
     position = (
@@ -162,13 +208,11 @@ async def get_media_item_metadata(loc: Locator) -> MediaItemMetadata:
         people = await get_people(loc)
     except RuntimeError:
         people = []
-    return MediaItemMetadata(
-        item=loc.page.url,
-        people=people,
-        albums=albums,
-        details=details,
-        position=position,
-    )
+    item.item = loc.page.url
+    item.people = people
+    item.albums = albums
+    item.details = details
+    item.position = position
 
 
 @quick_retry(RuntimeError, TimeoutError)

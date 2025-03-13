@@ -10,7 +10,7 @@ from warnings import simplefilter
 
 import google_photos_takeout_model
 
-DEBUG, SINGLE, ALT, INSPECT = False, False, True, False
+DEBUG, SINGLE, ALT, INSPECT, CLEAR = False, False, True, False, False
 if INSPECT:
     environ["PWDEBUG"] = "1"
 albums = Path(f"albums-{'single' if SINGLE else 'custom'}.json")
@@ -27,7 +27,7 @@ run(
         executable,
         *(["-X", "frozen_modules=off"] if environ.get("DEBUGPY_RUNNING") else []),
         Path(files(google_photos_takeout_model))  # pyright: ignore[reportArgumentType]
-        / f"get_media_metadata{'2' if ALT else ''}.py",
+        / f"{'clear_albums' if CLEAR else 'get_media_metadata'}{'2' if ALT and not CLEAR else ''}.py",
         *loads(albums.read_text(encoding="utf-8")),
     ],
     check=False,
