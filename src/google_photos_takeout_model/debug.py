@@ -1,6 +1,7 @@
+import logging
 from importlib.resources import files
 from json import loads
-from logging import DEBUG, basicConfig
+from logging import basicConfig
 from os import environ
 from pathlib import Path
 from subprocess import run
@@ -9,23 +10,25 @@ from warnings import simplefilter
 
 import google_photos_takeout_model
 
-if INSPECT := False:
+DEBUG, SINGLE, ALT, INSPECT = False, False, True, False
+if INSPECT:
     environ["PWDEBUG"] = "1"
-albums = Path(f"albums-{'single' if (SINGLE := False) else 'custom'}").with_suffix(
-    ".json"
-)
-basicConfig(
-    filename=Path(google_photos_takeout_model.__name__).with_suffix(".log"),
-    level=DEBUG,
-)
-for warning in [ResourceWarning, RuntimeWarning]:
-    simplefilter("error", warning)
-environ["PYTHONASYNCIODEBUG"] = "1"
+albums = Path(f"albums-{'single' if SINGLE else 'custom'}.json")
+if DEBUG:
+    environ["PYTHONASYNCIODEBUG"] = "1"
+    basicConfig(
+        filename=Path(google_photos_takeout_model.__name__).with_suffix(".log"),
+        level=logging.DEBUG,
+    )
+    for warning in [ResourceWarning, RuntimeWarning]:
+        simplefilter("error", warning)
 run(
-    [
+    args=[
         executable,
         *(["-X", "frozen_modules=off"] if environ.get("DEBUGPY_RUNNING") else []),
-        Path(files(google_photos_takeout_model)) / "get_media_metadata.py",  # pyright: ignore[reportArgumentType]
+        Path(files(google_photos_takeout_model))  # pyright: ignore[reportArgumentType]
+        / f"get_media_metadata{'2' if ALT else ''}.py",
         *loads(albums.read_text(encoding="utf-8")),
-    ]
+    ],
+    check=False,
 )

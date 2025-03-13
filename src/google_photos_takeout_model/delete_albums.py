@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from asyncio import run
+from asyncio import run, sleep
 
 from playwright.async_api import Locator
 from tqdm import tqdm
@@ -60,18 +60,18 @@ async def move_to_trash(loc: Locator):
     if await move_to_trash.count():
         await move_to_trash.click()
         await loc.page.get_by_role("button", name="Move to trash").click()
-        while await loc.page.get_by_text("Moving to trash").count():
-            await loc.page.wait_for_timeout(WAIT)
+        while await loc.page.get_by_text("Moving to trash").count():  # noqa: ASYNC110
+            await sleep(WAIT)
     else:
         await loc.page.get_by_label("Delete album").click()
         await loc.page.get_by_role("button", name="Delete").click()
         return
     waited = 0
-    while (waited < DELETE_ALBUM_TIMEOUT) and (
+    while (waited < DELETE_ALBUM_TIMEOUT) and (  # TODO: Use asyncio.Event()
         await loc_more_options(loc).count() or not await album_empty_after_deleting(loc)
     ):
         waited += WAIT
-        await loc.page.wait_for_timeout(WAIT)
+        await sleep(WAIT)
     if await album_empty_after_deleting(loc):
         return await loc.page.get_by_role("button", name="Delete").click()
     await delete_album(loc)

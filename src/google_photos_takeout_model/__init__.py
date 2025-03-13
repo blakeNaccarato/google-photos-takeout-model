@@ -1,26 +1,17 @@
 """Model for Google Takeout data for Google Photos."""
 
+from asyncio import sleep
 from dataclasses import dataclass
 from json import dumps, loads
 from pathlib import Path
-from typing import Literal, Self, TypeAlias, get_args
+from typing import Literal, Self, get_args
 
 from playwright.async_api import Locator
 
-from google_photos_takeout_model.pw import (
-    ITEM_SELECTION_THRESHOLD,
-    LONG_WAIT,
-    WAIT,
-)
+from google_photos_takeout_model.pw import ITEM_SELECTION_THRESHOLD, LONG_WAIT, WAIT
 
-Kinds: TypeAlias = Literal[
-    "copied",
-    "deleted",
-    "in",
-    "large",
-    "left",
-    "shared",
-    "were-shared",
+type Kinds = Literal[
+    "copied", "deleted", "in", "large", "left", "shared", "were-shared"
 ]
 kinds = get_args(Kinds)
 
@@ -42,17 +33,17 @@ async def select_all_photos(loc: Locator):
     await loc.page.get_by_role("checkbox").first.click()
     # ? Move to page bottom to show last checkbox. Do twice since it's flaky
     await loc.page.keyboard.press("End")
-    await loc.page.wait_for_timeout(WAIT)
+    await sleep(WAIT)
     await loc.page.keyboard.press("Home")
-    await loc.page.wait_for_timeout(WAIT)
+    await sleep(WAIT)
     await loc.page.keyboard.press("End")
-    await loc.page.wait_for_timeout(LONG_WAIT)
+    await sleep(LONG_WAIT)
     # ? Shift+select last checkbox to select all images
     if not await (last_box := loc.page.get_by_role("checkbox").last).is_checked():
         await loc.page.keyboard.down("Shift")
         await last_box.click()
         await loc.page.keyboard.up("Shift")
-    await loc.page.wait_for_timeout(WAIT)
+    await sleep(WAIT)
 
 
 async def many_photos_selected(loc: Locator) -> bool:
@@ -77,10 +68,10 @@ def get_albums() -> dict[Kinds, Albums]:
 
 
 async def more_options(loc: Locator):
-    while not await loc_more_options(loc).count():
-        await loc.page.wait_for_timeout(WAIT)
+    while not await loc_more_options(loc).count():  # noqa: ASYNC110
+        await sleep(WAIT)
     await loc_more_options(loc).click()
-    await loc.page.wait_for_timeout(WAIT)
+    await sleep(WAIT)
 
 
 def loc_more_options(loc: Locator) -> Locator:
