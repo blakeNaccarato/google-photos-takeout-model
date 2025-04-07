@@ -1,6 +1,4 @@
-from google_photos_takeout_model.models.bases import (
-    ToCamelBaseModel,
-)
+from google_photos_takeout_model.models.bases import ToCamelBaseModel
 
 
 class Composition(ToCamelBaseModel):

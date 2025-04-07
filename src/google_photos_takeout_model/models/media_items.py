@@ -84,13 +84,12 @@ class MediaItem(ToCamelBaseModel):
     @classmethod
     def from_path(cls, path: Path) -> MediaItem:
         # sourcery skip: merge-else-if-into-elif, remove-pass-elif
-        if (metadata_path := path.with_name(f"{path.name}.json")).exists():
-            pass
-        elif (metadata_path := path.with_name(f"{path.name}.jloc.page.json")).exists():
-            pass
-        elif (metadata_path := path.with_name(f"{path.stem}.json")).exists():
-            pass
-        elif (metadata_path := path.with_name(f"{path.stem}.jloc.page.json")).exists():
+        if (
+            (metadata_path := path.with_name(f"{path.name}.json")).exists()
+            or (metadata_path := path.with_name(f"{path.name}.jloc.page.json")).exists()
+            or (metadata_path := path.with_name(f"{path.stem}.json")).exists()
+            or (metadata_path := path.with_name(f"{path.stem}.jloc.page.json")).exists()
+        ):
             pass
         else:
             if path.stem.endswith("-edited"):
@@ -106,9 +105,7 @@ class MediaItem(ToCamelBaseModel):
                     metadata_path := path.with_name(
                         f"{stem['name']}{path.suffix}({stem['num']}).json"
                     )
-                ).exists():
-                    pass
-                elif (
+                ).exists() or (
                     metadata_path := path.with_name(
                         f"{stem['name']}{path.suffix}.jpg({stem['num']}).json"
                     )
