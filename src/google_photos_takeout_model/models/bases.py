@@ -6,9 +6,7 @@ from pydantic.alias_generators import to_camel
 
 class ToCamelBaseModel(BaseModel):
     model_config = ConfigDict(
-        alias_generator=to_camel,
-        validation_error_cause=True,
-        populate_by_name=True,
+        alias_generator=to_camel, validation_error_cause=True, populate_by_name=True
     )
 
 
