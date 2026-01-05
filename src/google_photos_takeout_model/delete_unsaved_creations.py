@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from asyncio import run
 
-from google_photos_takeout_model.pw import (
-    GPHOTOS_BASE_URL,
-    logged_in,
-)
+from google_photos_takeout_model.pw import GPHOTOS_BASE_URL, logged_in
 
 
 async def main():
